@@ -1,0 +1,149 @@
+---
+title: "week 41 NCAA Womens Basketball"
+author: "Alonso Cordova"
+date: "10/6/2020"
+output: html_document
+---
+
+
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(skimr)
+library(ggplot2)
+library(RColorBrewer)
+```
+
+
+
+
+Calling in Data
+```{r}
+
+df <- read_csv("tournament.csv") 
+
+skim_df <- skim(df)
+
+skim_df
+
+```
+
+
+
+
+
+
+
+Preparing data
+```{r}
+
+tourney_top <- df %>% 
+  filter(tourney_finish %in% c('Champ','N2nd')) %>% 
+  select(school,year,tourney_finish)
+
+
+champ_year <- spread(tourney_top,tourney_finish,school)
+
+# Tells us combinations of 1st and second place
+rivals <- champ_year %>% 
+  group_by(Champ,N2nd) %>% 
+  count() %>% 
+  ungroup() 
+
+
+# Tells us which teams have the most 2nd place finishes (add who they lost to)
+champs <- df %>% 
+  filter(tourney_finish == 'Champ') %>% 
+  group_by(school) %>% 
+  count() %>% 
+  filter(n >= 2) %>% 
+  arrange(n) 
+
+
+# Creating list to use as filter
+champs_list <- champs %>% 
+  select(school) %>% 
+  unlist()
+
+
+
+# Filtering schools from list created above
+rivals <- rivals %>% 
+  filter(Champ %in% champs_list) %>% 
+  rename(school = Champ)
+
+
+
+# Manually setting factors
+rivals$school <- factor(rivals$school, levels = c('Baylor',
+                                              'Louisiana Tech',
+                                              'Notre Dame',
+                                              'Southern California',
+                                              'Stanford',
+                                              'Tennessee',
+                                              'UConn'))
+
+```
+
+
+Using this to expand palette beyond default 8
+```{r}
+
+set.seed(100)
+
+nb.cols <- 18
+mycolors <- colorRampPalette(brewer.pal(8, "Paired"))(nb.cols)   # Expands palette beyond default 8
+
+
+```
+
+
+
+Plot graph
+```{r}
+
+
+p1 <- ggplot(rivals,aes(school,n, fill = reorder(N2nd,n))) +
+      geom_bar(stat = 'identity', color = 'black') +
+  geom_text(aes(label=N2nd),size = 2,  position=position_stack(vjust=0.5)) +
+  geom_text(data = champs, aes(school,n,label = n, fill = NULL), hjust = -.5,size = 3.5) +
+      labs(title = 'NCAA Womens Basketball Tournaments: 1982-2018', # The show must go on
+        subtitle = "Schools with the most championships and the teams they had to beat to win it all",
+         x = '',
+         y = '',
+         fill = '',
+    caption = "Data: FiceThirtyEight | @Alocord") +
+   scale_y_continuous(limits = c(0,12), expand = c(0,0), breaks = c(1:11)) + 
+  scale_fill_manual(values=mycolors)+
+  coord_flip() +
+    theme (
+      plot.title        = element_text(size = 10),
+      plot.subtitle = element_text(size = 8),
+   #   plot.subtitle     = element_text(face = 'bold', size = 12),
+      plot.caption      = element_text(size = 8),
+      ##
+      panel.background  = element_blank(),
+     # panel.grid        = element_blank(),
+      ##
+      legend.position    = "none", # top right
+      ##
+      axis.title.x      = element_text(face = 'bold', size = 10),
+     # axis.text.x       = element_text(angle = 90),
+     
+      ##
+      axis.title.y      = element_blank(),
+      axis.text.y       = element_text(face = 'bold', size = 10),
+      axis.line.y = element_line(),
+      ##
+      axis.ticks        = element_blank(),
+      plot.margin       = unit(c(.05, .05, .05, .05), "in"))
+
+
+p1
+
+
+ggsave("week41 NCAA.png", p1,width = 9)
+
+
+```
